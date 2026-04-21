@@ -1,0 +1,13 @@
+{
+  "name": "northflank-enjambre",
+  "version": "1.0.0",
+  "description": "Escuadrón francotirador",
+  "main": "spam.js",
+  "scripts": {
+    "start": "node spam.js"
+  },
+  "dependencies": {
+    "discord.js-selfbot-v13": "^2.14.0"
+  }
+}
+
