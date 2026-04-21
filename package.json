@@ -1,8 +1,10 @@
 {
   "name": "northflank-enjambre",
   "version": "1.0.0",
-  "description": "Escuadron francotirador",
   "main": "spam.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "node spam.js"
   },
