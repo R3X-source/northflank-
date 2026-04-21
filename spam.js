@@ -29,13 +29,9 @@ const tokens = [
 // 🎯 CONFIGURACIÓN
 // =========================================================
 
-// Canal para spam NORMAL (solo este)
 const CANAL_SPAM_NORMAL = "1481514534190448815";
-
-// Servidor con restricción para autorespondedor
 const SERVIDOR_RESTRINGIDO = "1239701315580592148";
 
-// Canales DONDE SÍ FUNCIONA el autorespondedor en ese servidor
 const CANALES_AUTORESPUESTA_EN_RESTRINGIDO = new Set([
     "1270239207071420450",
     "1266542890767876229",
@@ -43,7 +39,6 @@ const CANALES_AUTORESPUESTA_EN_RESTRINGIDO = new Set([
     "1239719951435304960"
 ]);
 
-// Usuarios vigilados (autorespondedor)
 const VIGILADOS = new Set([
     "1431785955559215184", "1457521662303015040", "1485179919523643454",
     "1003450010702205030", "1480289152397213907", "1467397075204309034",
@@ -51,13 +46,10 @@ const VIGILADOS = new Set([
     "1492265983165862029", "1493834586755694672"
 ]);
 
-// IDS_UNIFICADAS (las menciones)
 const IDS_UNIFICADAS = "<@1490277865818689700> <@1494684335352316065> <@1442335922111910024> <@1346593401088249977> <@1429887342373765146> <@1493426752536711230> <@1493834586755694672> <@1425209744603218020> <@1492265983165862029> <@1427713721479987232> <@984956970014486528> <@1072352198836621385> <@1429177016703516764> <@1438314463970328578> <@1446586105553227807> <@957014429822750771> <@1423439348430405722> <@1455444386421674007> <@1394021604127936772> <@1452533908699611236> <@1459077041637953651> <@1468117706099396816> <@1467397075204309034> <@1466878653932634195> <@1458314974794616902> <@1470913175401533543> <@1464354934785839155> <@1394023020896714762> <@1399500980889976902> <@1462897561894649876> <@1386330375952793723> <@1353778890514108456> <@1480289152397213907> <@1457175804290007197> <@1490277865818689700> <@1492675664682287277> <@1487148931535212817> <@1457521662303015040>";
 
-// Mensaje fijo para autorespondedor
 const MENSAJE_AUTORESPUESTA = "MAMITA QUERIDA QUE PUTITA Q ERES, NO SE QUIEN SERÁ TU CULITO PERO SI TU CULITO RECIBE ESTO ES PORQUE BÁSICAMENTE ME LA PELAS Y DESCONOZCO QUIEN SERÁS FEMINA PERO SIEMPRE VAS A ENTENDER Q A MI ME LA PELAS COMO CJOTIÑA JAKSJJAJSA Y POR ESO TE DEJO MIS BOLAS DRENADAS Y ENSALOBADAS POR LA MICHOACANA DE CJOTORRA CHE";
 
-// Textos para spam normal (pueden variar)
 const TEXTOS_SPAM = [
     "PVTITA RETIRADA VÁMONOS A SPOM DE AÑOS POR NO DECIR TODA LA VDIA😂🤣🤣🤣🤣 MEJICHANGA MONCLOVEÑANGA COAHUILA PUTA JSJSJSJS",
     "JSJSJS MEJICHANGAS RETIRADAS AL SPAM ETERNO 🤣🤣🤣 PEDORRASO DE MAMITAS CHIE ACÁ SE VAN A QUEDAR HASTA Q YO ME MUERA JSJSJSJS😂",
@@ -82,8 +74,9 @@ let botsActivos = [];
 let turnoActual = 0;
 let alertaAutoRespondedor = false;
 let ultimoVigilado = null;
+let spamLoopActivo = false;
+let autoResponderLoopActivo = false;
 
-// Renovar alerta cada 2 segundos
 setInterval(() => {
     alertaAutoRespondedor = false;
     ultimoVigilado = null;
@@ -93,7 +86,6 @@ setInterval(() => {
 // 📝 FUNCIONES
 // =========================================================
 
-// Mensaje para spam normal (con multimedia y texto variable)
 function generarMensajeSpam() {
     const texto = TEXTOS_SPAM[Math.floor(Math.random() * TEXTOS_SPAM.length)];
     const media = MULTIMEDIA[Math.floor(Math.random() * MULTIMEDIA.length)];
@@ -101,24 +93,18 @@ function generarMensajeSpam() {
     return `${IDS_UNIFICADAS}\n${texto}\n${media}\n${salt}`;
 }
 
-// Mensaje para autorespondedor (FIJO + menciones)
 function generarMensajeAutorespuesta() {
     const salt = `[\`${Math.random().toString(36).substring(7).toUpperCase()}\`]`;
     return `${IDS_UNIFICADAS}\n${MENSAJE_AUTORESPUESTA}\n${salt}`;
 }
 
-// Verificar si el canal permite autorespuesta (regla del servidor restringido)
 function puedeResponderAutorespuesta(guildId, channelId) {
-    // Si no es el servidor restringido, se puede en cualquier canal
-    if (guildId !== SERVIDOR_RESTRINGIDO) {
-        return true;
-    }
-    // Si es el servidor restringido, solo en los 4 canales permitidos
+    if (guildId !== SERVIDOR_RESTRINGIDO) return true;
     return CANALES_AUTORESPUESTA_EN_RESTRINGIDO.has(channelId);
 }
 
 // =========================================================
-// 🤖 LÍDER (El único que escucha)
+// 🤖 LÍDER
 // =========================================================
 async function launchLider(token) {
     const client = new Client({
@@ -132,41 +118,47 @@ async function launchLider(token) {
         http: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
     });
 
-    client.on('ready', async () => {
-        botsActivos.push(client);
-        console.log(`🎖️ [LÍDER] ${client.user.username} EN POSICIÓN (vigilando a ${VIGILADOS.size} usuarios)`);
+    client.on('ready', () => {
+        if (!botsActivos.includes(client)) {
+            botsActivos.push(client);
+        }
+        console.log(`🎖️ [LÍDER] ${client.user.username} EN POSICIÓN (Total bots activos: ${botsActivos.length})`);
         
         const estado = ESTADOS[Math.floor(Math.random() * ESTADOS.length)];
         const tipo = TIPOS[Math.floor(Math.random() * TIPOS.length)];
         client.user.setActivity(estado, { type: tipo });
+        
+        // Iniciar loops si es el primer bot
+        if (!spamLoopActivo) {
+            spamLoopActivo = true;
+            setTimeout(() => spamNormalLoop(), 10000);
+        }
+        if (!autoResponderLoopActivo) {
+            autoResponderLoopActivo = true;
+            setTimeout(() => autoResponderLoop(), 10000);
+        }
     });
 
-    // El LÍDER escucha a los vigilados
     client.on('messageCreate', async (msg) => {
         if (msg.author.id === client.user.id) return;
         if (!VIGILADOS.has(msg.author.id)) return;
-        
-        // Verificar si el canal permite autorespuesta
         if (!puedeResponderAutorespuesta(msg.guild?.id, msg.channel.id)) return;
         
-        console.log(`🔊 [LÍDER] ¡${msg.author.username} habló en ${msg.channel.id}! Activando alerta...`);
+        console.log(`🔊 [LÍDER] ${msg.author.username} habló en ${msg.channel.id}`);
         alertaAutoRespondedor = true;
         ultimoVigilado = msg.author.id;
     });
 
     client.login(token).catch(err => console.log(`❌ [LÍDER] Login fallido: ${err.message}`));
     
-    // Reconexión cada 1-6 horas
-    const reconTime = Math.random() * 18000000 + 3600000;
     setTimeout(() => {
-        console.log(`🔄 [LÍDER] Reconectando...`);
         client.destroy();
         setTimeout(() => launchLider(token), 5000);
-    }, reconTime);
+    }, Math.random() * 18000000 + 3600000);
 }
 
 // =========================================================
-// 🪖 SOLDADO (Ciego, solo copia órdenes)
+// 🪖 SOLDADO
 // =========================================================
 async function launchSoldado(token, id) {
     const client = new Client({
@@ -180,9 +172,11 @@ async function launchSoldado(token, id) {
         http: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
     });
 
-    client.on('ready', async () => {
-        botsActivos.push(client);
-        console.log(`🪖 [SOLDADO ${id}] ${client.user.username} EN POSICIÓN`);
+    client.on('ready', () => {
+        if (!botsActivos.includes(client)) {
+            botsActivos.push(client);
+        }
+        console.log(`🪖 [SOLDADO ${id}] ${client.user.username} LISTO (Total bots activos: ${botsActivos.length})`);
         
         const estado = ESTADOS[Math.floor(Math.random() * ESTADOS.length)];
         const tipo = TIPOS[Math.floor(Math.random() * TIPOS.length)];
@@ -191,35 +185,31 @@ async function launchSoldado(token, id) {
 
     client.login(token).catch(err => console.log(`❌ [SOLDADO ${id}] Login fallido: ${err.message}`));
     
-    // Reconexión cada 1-6 horas
-    const reconTime = Math.random() * 18000000 + 3600000;
     setTimeout(() => {
-        console.log(`🔄 [SOLDADO ${id}] Reconectando...`);
         client.destroy();
         setTimeout(() => launchSoldado(token, id), 5000);
-    }, reconTime);
+    }, Math.random() * 18000000 + 3600000);
 }
 
 // =========================================================
-// 📢 SPAM NORMAL (45-70 mensajes cada 110 segundos entre todos)
+// 📢 SPAM NORMAL (ROTATIVO ENTRE TODOS LOS BOTS)
 // =========================================================
 async function spamNormalLoop() {
     let cachedChannel = null;
     
     while (true) {
         if (botsActivos.length === 0) {
+            console.log(`⚠️ [SPAM] Esperando bots conectados... (0/???)`);
             await sleep(5000);
             continue;
         }
         
-        // Meta: 45-70 mensajes entre TODOS los bots
         const metaGlobal = Math.floor(Math.random() * (70 - 45 + 1)) + 45;
-        const ventanaMs = 110 * 1000; // 110 segundos
+        const ventanaMs = 110 * 1000;
         const delayBaseMs = ventanaMs / metaGlobal;
         
-        console.log(`📊 [SPAM] ${metaGlobal} mensajes en ${ventanaMs/1000}s | ${botsActivos.length} bots | delay ~${Math.round(delayBaseMs)}ms`);
+        console.log(`📊 [SPAM] ${metaGlobal} mensajes en ${ventanaMs/1000}s | ${botsActivos.length} bots activos | delay ~${Math.round(delayBaseMs)}ms`);
         
-        // Obtener canal de spam normal
         if (!cachedChannel) {
             cachedChannel = await botsActivos[0]?.channels.fetch(CANAL_SPAM_NORMAL).catch(() => null);
         }
@@ -230,35 +220,36 @@ async function spamNormalLoop() {
             continue;
         }
         
-        // Distribuir mensajes entre bots (turnos rotativos)
         for (let i = 0; i < metaGlobal; i++) {
-            const bot = botsActivos[turnoActual % botsActivos.length];
+            // 🔥 ROTACIÓN CORRECTA: cada mensaje lo manda un bot diferente
+            const botIndex = turnoActual % botsActivos.length;
+            const bot = botsActivos[botIndex];
+            
             if (bot && cachedChannel) {
                 await cachedChannel.send(generarMensajeSpam()).catch(err => {
                     if (err.code === 429) {
-                        console.log(`⏰ [SPAM] Rate limit, esperando...`);
+                        console.log(`⏰ [SPAM] Rate limit en bot ${bot.user?.username}`);
                     } else {
                         cachedChannel = null;
                     }
                 });
+                console.log(`💥 [SPAM] Msg ${i+1}/${metaGlobal} enviado por ${bot.user?.username || '?'} (turno ${turnoActual})`);
                 turnoActual++;
                 if (turnoActual > 1000000) turnoActual = 0;
             }
             
-            // Delay con jitter
             const jitter = (Math.random() * 500) - 250;
             await sleep(Math.max(1000, delayBaseMs + jitter));
         }
         
-        // Descanso entre ventanas
-        const descanso = Math.random() * 5000 + 3000; // 3-8 segundos
+        const descanso = Math.random() * 5000 + 3000;
         console.log(`💤 [SPAM] Descanso de ${(descanso/1000).toFixed(0)}s`);
         await sleep(descanso);
     }
 }
 
 // =========================================================
-// ⚡ AUTORESPONDEDOR (Todos los bots responden a la alerta del líder)
+// ⚡ AUTORESPONDEDOR
 // =========================================================
 async function autoResponderLoop() {
     let ultimaRespuesta = 0;
@@ -266,23 +257,17 @@ async function autoResponderLoop() {
     while (true) {
         if (alertaAutoRespondedor && botsActivos.length > 0) {
             const ahora = Date.now();
-            if (ahora - ultimaRespuesta >= 2000) { // Mínimo 2 seg entre respuestas
-                console.log(`⚡ [AUTORESPUESTA] Alerta activa! Respondiendo...`);
+            if (ahora - ultimaRespuesta >= 2000) {
+                console.log(`⚡ [AUTORESPUESTA] Alerta! Respondiendo...`);
                 
-                // Todos los bots responden (pero en el mismo canal donde se activó)
-                // Para simplificar, tomamos el primer bot activo y respondemos
-                const bot = botsActivos[0];
-                if (bot) {
-                    // Buscar un canal válido para responder
+                for (const bot of botsActivos) {
                     let canalRespuesta = null;
                     
-                    // Intentar en el canal restringido primero
                     for (const canalId of CANALES_AUTORESPUESTA_EN_RESTRINGIDO) {
                         canalRespuesta = await bot.channels.fetch(canalId).catch(() => null);
                         if (canalRespuesta) break;
                     }
                     
-                    // Si no, buscar cualquier canal donde pueda escribir
                     if (!canalRespuesta) {
                         for (const [_, guild] of bot.guilds.cache) {
                             for (const [_, channel] of guild.channels.cache) {
@@ -298,15 +283,11 @@ async function autoResponderLoop() {
                     }
                     
                     if (canalRespuesta) {
-                        await canalRespuesta.send(generarMensajeAutorespuesta()).catch(err => {
-                            console.log(`❌ [AUTORESPUESTA] Error: ${err.code}`);
-                        });
-                        console.log(`✅ [AUTORESPUESTA] Respuesta enviada a ${canalRespuesta.id}`);
-                        ultimaRespuesta = ahora;
-                    } else {
-                        console.log(`⚠️ [AUTORESPUESTA] No se encontró canal para responder`);
+                        await canalRespuesta.send(generarMensajeAutorespuesta()).catch(() => {});
+                        console.log(`✅ [AUTORESPUESTA] ${bot.user?.username} respondió en ${canalRespuesta.id}`);
                     }
                 }
+                ultimaRespuesta = ahora;
                 await sleep(1000);
             }
         }
@@ -321,24 +302,10 @@ http.createServer((req, res) => res.end("OK")).listen(process.env.PORT || 8080);
 
 console.log(`🚀 Iniciando enjambre Northflank con ${tokens.length} bots`);
 console.log(`📡 Spam normal → canal ${CANAL_SPAM_NORMAL}`);
-console.log(`📡 Autorespondedor → líder escucha, todos responden`);
-console.log(`📡 Servidor restringido: ${SERVIDOR_RESTRINGIDO} → solo ${CANALES_AUTORESPUESTA_EN_RESTRINGIDO.size} canales`);
 
-// Lanzar líder (token 1)
-if (tokens[0]) {
-    setTimeout(() => launchLider(tokens[0]), 5000);
-}
-
-// Lanzar soldados (tokens 2 al 8)
+if (tokens[0]) setTimeout(() => launchLider(tokens[0]), 5000);
 for (let i = 1; i < tokens.length; i++) {
     if (tokens[i]) {
         setTimeout(() => launchSoldado(tokens[i], i), i * 12000);
     }
 }
-
-// Iniciar loops después de que los bots tengan chance de conectarse
-setTimeout(() => {
-    console.log("🎯 Activando loops de spam y autorespuesta...");
-    spamNormalLoop();
-    autoResponderLoop();
-}, 60000);
