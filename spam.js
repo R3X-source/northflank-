@@ -117,14 +117,12 @@ async function launchLider(token) {
     });
 
     client.on('ready', () => {
-        // Agregar a la lista si no está ya
         if (!botsActivos.find(b => b.user?.id === client.user?.id)) {
             botsActivos.push(client);
         }
         console.log(`🎖️ [LÍDER] ${client.user.username} CONECTADO`);
         console.log(`📊 Total bots activos: ${botsActivos.length}`);
         
-        // Mostrar lista de bots activos
         botsActivos.forEach((b, idx) => {
             console.log(`   ${idx + 1}. ${b.user?.username}`);
         });
@@ -133,7 +131,6 @@ async function launchLider(token) {
         const tipo = TIPOS[Math.floor(Math.random() * TIPOS.length)];
         client.user.setActivity(estado, { type: tipo });
         
-        // Iniciar loops solo una vez
         if (!spamLoopActivo) {
             spamLoopActivo = true;
             setTimeout(() => spamNormalLoop(), 15000);
@@ -155,7 +152,6 @@ async function launchLider(token) {
 
     client.login(token).catch(err => console.log(`❌ [LÍDER] Login fallido: ${err.message}`));
     
-    // Reconexión automática
     setTimeout(() => {
         console.log(`🔄 [LÍDER] Reconectando...`);
         const index = botsActivos.findIndex(b => b.user?.id === client.user?.id);
@@ -208,13 +204,12 @@ async function launchSoldado(token, id) {
 }
 
 // =========================================================
-// 📢 SPAM NORMAL (ROTATIVO)
+// 📢 SPAM NORMAL (ROTATIVO CON DELAY MÍNIMO 5 SEGUNDOS)
 // =========================================================
 async function spamNormalLoop() {
     let cachedChannel = null;
     
     while (true) {
-        // Esperar a que haya al menos 1 bot
         while (botsActivos.length === 0) {
             console.log(`⚠️ [SPAM] Esperando bots... (0 activos)`);
             await sleep(5000);
@@ -226,7 +221,7 @@ async function spamNormalLoop() {
         const ventanaMs = 110 * 1000;
         const delayBaseMs = ventanaMs / metaGlobal;
         
-        console.log(`📊 [SPAM] Meta: ${metaGlobal} mensajes | ${botsActivos.length} bots | delay ~${Math.round(delayBaseMs)}ms`);
+        console.log(`📊 [SPAM] Meta: ${metaGlobal} mensajes | ${botsActivos.length} bots | delay base ~${Math.round(delayBaseMs)}ms`);
         
         if (!cachedChannel) {
             cachedChannel = await botsActivos[0]?.channels.fetch(CANAL_SPAM_NORMAL).catch(() => null);
@@ -239,7 +234,6 @@ async function spamNormalLoop() {
         }
         
         for (let i = 0; i < metaGlobal; i++) {
-            // 🔥 ROTACIÓN: cada mensaje un bot diferente
             if (botsActivos.length === 0) {
                 console.log(`⚠️ [SPAM] No hay bots activos, esperando...`);
                 break;
@@ -263,7 +257,8 @@ async function spamNormalLoop() {
             }
             
             const jitter = (Math.random() * 500) - 250;
-            await sleep(Math.max(1000, delayBaseMs + jitter));
+            // ✅ DELAY MÍNIMO DE 5 SEGUNDOS (5000ms)
+            await sleep(Math.max(5000, delayBaseMs + jitter));
         }
         
         const descanso = Math.random() * 5000 + 3000;
@@ -325,14 +320,13 @@ async function autoResponderLoop() {
 http.createServer((req, res) => res.end("OK")).listen(process.env.PORT || 8080);
 
 console.log(`🚀 Iniciando enjambre Northflank con ${tokens.length} tokens`);
+console.log(`✅ Delay mínimo entre mensajes: 5 SEGUNDOS`);
 
-// Lanzar líder
 if (tokens[0]) {
     console.log(`🎖️ Lanzando líder...`);
     setTimeout(() => launchLider(tokens[0]), 5000);
 }
 
-// Lanzar soldados
 for (let i = 1; i < tokens.length; i++) {
     if (tokens[i]) {
         console.log(`🪖 Lanzando soldado ${i}...`);
@@ -340,7 +334,6 @@ for (let i = 1; i < tokens.length; i++) {
     }
 }
 
-// Mostrar estado cada 30 segundos para depuración
 setInterval(() => {
     console.log(`🔍 [DEBUG] Bots activos: ${botsActivos.length} | Turno: ${turnoActual}`);
     botsActivos.forEach((b, idx) => {
