@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "spam.js",
   "dependencies": {
-    "discord.js-selfbot-v13": "latest"
+    "discord.js-selfbot-v13": "^2.15.0",
+    "debug": "^4.3.4"
   }
 }
