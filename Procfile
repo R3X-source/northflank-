@@ -1,2 +1,2 @@
-node spam.js
+web: node spam.js
 
