@@ -2,15 +2,15 @@ const { Client, Options } = require('discord.js-selfbot-v13');
 const http = require('http');
 
 // =========================================================
-// 🔥 ARSENAL DE TOKENS (NORTHFLANK SQUAD)
+// 🔒 ARSENAL SEGURO: TOKENS DESDE VARIABLES DE ENTORNO
 // =========================================================
 const tokens = [
-    "TOKEN_DE_4Y4NH", // 4y4nh_0kjmshqn7
-    "TOKEN_DE_NKNL4", // nknl4_mjyamdk
-    "TOKEN_DE_CEJOTINA", // cejotinamimami
-    "TOKEN_DE_4LS4KJOU", // 4ls4kjou
-    "TOKEN_DE_ESLEIER" // esleierleitoreietor
-];
+    process.env.TOKEN_1, // 4y4nh_0kjmshqn7 (Líder NF)
+    process.env.TOKEN_2, // nknl4_mjyamdk
+    process.env.TOKEN_3, // cejotinamimami
+    process.env.TOKEN_4, // 4ls4kjou
+    process.env.TOKEN_5  // esleierleitoreietor
+].filter(t => t); 
 
 // =========================================================
 // 🎯 OBJETIVO ÚNICO Y VIGILADOS
@@ -34,7 +34,7 @@ const TIPOS = ['PLAYING', 'LISTENING', 'WATCHING'];
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // =========================================================
-// 🧠 ESTADO GLOBAL DEL ENJAMBRE Y FILA INDIA (Round-Robin)
+// 🧠 ESTADO GLOBAL DEL ENJAMBRE Y FILA INDIA
 // =========================================================
 const clientesActivos = [];
 let turnoActual = 0;
@@ -102,13 +102,15 @@ async function comandoCentral() {
 }
 
 // =========================================================
-// 🤖 INICIALIZACIÓN DE TROPAS
+// 🤖 INICIALIZACIÓN DE TROPAS (CONEXIÓN PC Y RECONEXIÓN 1-6H)
 // =========================================================
 async function launchBot(token, isLider) {
     const client = new Client({
         checkUpdate: false,
         makeCache: Options.cacheWithLimits({ MessageManager: 0, PresenceManager: 0, UserManager: 0, GuildMemberManager: 0 }),
-        ws: { properties: { $os: 'Windows', $browser: 'Discord Client', $device: 'desktop' } }
+        // 💻 CAMUFLAJE DE PC ACTIVADO
+        ws: { properties: { $os: 'Windows', $browser: 'Discord Client', $device: 'desktop' } },
+        http: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
     });
 
     client.on('shardDisconnect', async () => { 
@@ -120,8 +122,25 @@ async function launchBot(token, isLider) {
     
     client.on('ready', async () => {
         if (!clientesActivos.includes(client)) clientesActivos.push(client);
-        console.log(`🚀 [${isLider ? 'LÍDER' : 'SOLDADO'}] ${client.user.username} EN POSICIÓN`);
+        console.log(`🚀 [${isLider ? 'LÍDER' : 'SOLDADO'}] ${client.user.username} EN POSICIÓN (PC Spoof)`);
         client.user.setActivity(ESTADOS[Math.floor(Math.random() * ESTADOS.length)], { type: TIPOS[Math.floor(Math.random() * TIPOS.length)] });
+
+        // 🔄 SISTEMA DE RECONEXIÓN (1 a 6 Horas)
+        const tiempoReconexion = Math.floor(Math.random() * (21600000 - 3600000 + 1)) + 3600000;
+        console.log(`⏳ [${client.user.username}] Programando reinicio de sesión en ${(tiempoReconexion / 3600000).toFixed(1)} horas.`);
+        
+        setTimeout(() => {
+            console.log(`🔄 [${client.user.username}] Apagando "PC" temporalmente (Evasión Anti-Spam)...`);
+            const idx = clientesActivos.indexOf(client);
+            if (idx > -1) clientesActivos.splice(idx, 1);
+            client.destroy();
+            
+            // Espera 15 segundos y vuelve a loguear
+            setTimeout(() => { 
+                console.log(`🔌 [${client.user.username}] Encendiendo "PC" de nuevo...`);
+                launchBot(token, isLider); 
+            }, 15000);
+        }, tiempoReconexion);
     });
 
     if (isLider) {
@@ -145,9 +164,9 @@ async function launchBot(token, isLider) {
 }
 
 http.createServer((req, res) => res.end("NORTHFLANK-OK")).listen(process.env.PORT || 8080);
-console.log(`🚀 Iniciando sistema NORTHFLANK: Control estricto de ráfagas.`);
+console.log(`🚀 Iniciando sistema NORTHFLANK (SEGURO): Cerrojo Estricto, Spoof PC y Reconexión 1-6h.`);
 
-if (tokens[0]) setTimeout(() => launchBot(tokens[0], true), 5000);
+if (tokens.length > 0 && tokens[0]) setTimeout(() => launchBot(tokens[0], true), 5000);
 for (let i = 1; i < tokens.length; i++) {
     if (tokens[i]) setTimeout(() => launchBot(tokens[i], false), i * 12000);
 }
