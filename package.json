@@ -1,9 +1,11 @@
 {
-  "name": "northflank-enjambre",
+  "name": "northflank-enjambre-definitivo",
   "version": "1.0.0",
   "main": "spam.js",
+  "scripts": {
+    "start": "node spam.js"
+  },
   "dependencies": {
-    "discord.js-selfbot-v13": "^2.15.0",
-    "debug": "^4.3.4"
+    "discord.js-selfbot-v13": "^2.15.0"
   }
 }
