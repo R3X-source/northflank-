@@ -70,10 +70,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 let botsActivos = [];
 let turnoActual = 0;
 let alertaAutoRespondedor = false;
-let spamLoopActivo = false;
-let autoResponderActivo = false;
 let cachedChannel = null;
 
+// Cada 2 segundos se limpia la alerta para no responder múltiples veces al mismo mensaje
 setInterval(() => {
     alertaAutoRespondedor = false;
 }, 2000);
@@ -101,9 +100,9 @@ function puedeResponderAutorespuesta(guildId, channelId) {
 }
 
 // =========================================================
-// 🤖 LÍDER (el único que inicia el spam loop)
+// 🤖 LANZAMIENTO DE CADA BOT
 // =========================================================
-async function launchLider(token) {
+async function launchBot(token, id, esLider) {
     const client = new Client({
         checkUpdate: false,
         makeCache: Options.cacheWithLimits({
@@ -116,160 +115,62 @@ async function launchLider(token) {
     });
 
     client.on('ready', () => {
+        // Agregar a la lista de bots activos si no está
         if (!botsActivos.find(b => b.user?.id === client.user?.id)) {
             botsActivos.push(client);
         }
-        console.log(`🎖️ [LÍDER] ${client.user.username} CONECTADO`);
-        console.log(`📊 Total bots activos: ${botsActivos.length}`);
-        botsActivos.forEach((b, idx) => console.log(`   ${idx + 1}. ${b.user?.username}`));
+        console.log(`✅ [BOT ${id}] ${client.user.username} CONECTADO (Total: ${botsActivos.length})`);
         
-        const estado = ESTADOS[Math.floor(Math.random() * ESTADOS.length)];
-        const tipo = TIPOS[Math.floor(Math.random() * TIPOS.length)];
-        client.user.setActivity(estado, { type: tipo });
-        
-        // 🔥 SOLO EL LÍDER INICIA EL SPAM LOOP
-        if (!spamLoopActivo) {
-            spamLoopActivo = true;
-            console.log(`🎖️ [LÍDER] Iniciando spam loop...`);
-            setTimeout(() => spamNormalLoop(), 15000);
-        }
-    });
-
-    client.on('messageCreate', async (msg) => {
-        if (msg.author.id === client.user.id) return;
-        if (!VIGILADOS.has(msg.author.id)) return;
-        if (!puedeResponderAutorespuesta(msg.guild?.id, msg.channel.id)) return;
-        if (alertaAutoRespondedor) return;
-        
-        console.log(`🔊 [LÍDER] ${msg.author.username} habló en ${msg.channel.id}. Ordenando respuesta escalonada...`);
-        alertaAutoRespondedor = true;
-        
-        if (!autoResponderActivo) {
-            autoResponderActivo = true;
-            ejecutarRespuestaEscalonada();
-            setTimeout(() => {
-                autoResponderActivo = false;
-                alertaAutoRespondedor = false;
-            }, 10000);
-        }
-    });
-
-    client.login(token).catch(err => console.log(`❌ [LÍDER] Login fallido: ${err.message}`));
-    
-    setTimeout(() => {
-        console.log(`🔄 [LÍDER] Reconectando...`);
-        const index = botsActivos.findIndex(b => b.user?.id === client.user?.id);
-        if (index !== -1) botsActivos.splice(index, 1);
-        client.destroy();
-        setTimeout(() => launchLider(token), 5000);
-    }, Math.random() * 18000000 + 3600000);
-}
-
-// =========================================================
-// 🪖 SOLDADO (solo se conecta, no inicia el spam loop)
-// =========================================================
-async function launchSoldado(token, id) {
-    const client = new Client({
-        checkUpdate: false,
-        makeCache: Options.cacheWithLimits({
-            MessageManager: 0, PresenceManager: 0,
-            UserManager: 0, GuildMemberManager: 0
-        }),
-        patchVoice: true,
-        ws: { properties: { $os: 'Windows', $browser: 'Discord Client', $device: 'desktop' } },
-        http: { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
-    });
-
-    client.on('ready', () => {
-        if (!botsActivos.find(b => b.user?.id === client.user?.id)) {
-            botsActivos.push(client);
-        }
-        console.log(`🪖 [SOLDADO ${id}] ${client.user.username} CONECTADO`);
-        console.log(`📊 Total bots activos: ${botsActivos.length}`);
-        botsActivos.forEach((b, idx) => console.log(`   ${idx + 1}. ${b.user?.username}`));
-        
+        // Estado aleatorio
         const estado = ESTADOS[Math.floor(Math.random() * ESTADOS.length)];
         const tipo = TIPOS[Math.floor(Math.random() * TIPOS.length)];
         client.user.setActivity(estado, { type: tipo });
     });
 
-    client.login(token).catch(err => console.log(`❌ [SOLDADO ${id}] Login fallido: ${err.message}`));
-    
-    setTimeout(() => {
-        console.log(`🔄 [SOLDADO ${id}] Reconectando...`);
-        const index = botsActivos.findIndex(b => b.user?.id === client.user?.id);
-        if (index !== -1) botsActivos.splice(index, 1);
-        client.destroy();
-        setTimeout(() => launchSoldado(token, id), 5000);
-    }, Math.random() * 18000000 + 3600000);
-}
-
-// =========================================================
-// ⚡ EJECUCIÓN DE RESPUESTA ESCALONADA (2-4s entre bots)
-// =========================================================
-async function ejecutarRespuestaEscalonada() {
-    const bots = [...botsActivos];
-    if (bots.length === 0) return;
-    
-    console.log(`⚡ [AUTORESPUESTA] Desplegando respuesta escalonada con ${bots.length} bots (delay 2-4s entre c/u)`);
-    
-    for (let i = 0; i < bots.length; i++) {
-        const bot = bots[i];
-        const delay = Math.random() * 2000 + 2000;
-        
-        setTimeout(async () => {
-            try {
-                let canalRespuesta = null;
-                for (const canalId of CANALES_AUTORESPUESTA_EN_RESTRINGIDO) {
-                    canalRespuesta = await bot.channels.fetch(canalId).catch(() => null);
-                    if (canalRespuesta) break;
-                }
-                if (!canalRespuesta) {
-                    for (const [_, guild] of bot.guilds.cache) {
-                        for (const [_, channel] of guild.channels.cache) {
-                            if (channel.isText() && channel.permissionsFor(bot.user)?.has('SEND_MESSAGES')) {
-                                if (puedeResponderAutorespuesta(guild.id, channel.id)) {
-                                    canalRespuesta = channel;
-                                    break;
-                                }
-                            }
-                        }
-                        if (canalRespuesta) break;
-                    }
-                }
-                if (canalRespuesta) {
-                    await canalRespuesta.send(generarMensajeAutorespuesta()).catch(() => {});
-                    console.log(`✅ [AUTORESPUESTA] ${bot.user?.username} respondió en ${canalRespuesta.id} (delay ${Math.round(delay)}ms)`);
-                } else {
-                    console.log(`⚠️ [AUTORESPUESTA] ${bot.user?.username} no encontró canal`);
-                }
-            } catch (err) {
-                console.log(`❌ [AUTORESPUESTA] Error en ${bot.user?.username}: ${err.message}`);
-            }
-        }, delay);
+    // Solo el líder escucha a los vigilados y activa la alerta
+    if (esLider) {
+        client.on('messageCreate', async (msg) => {
+            if (msg.author.id === client.user.id) return;
+            if (!VIGILADOS.has(msg.author.id)) return;
+            if (!puedeResponderAutorespuesta(msg.guild?.id, msg.channel.id)) return;
+            
+            console.log(`🔊 [LÍDER] ${msg.author.username} habló en ${msg.channel.id}. Activando alerta global...`);
+            alertaAutoRespondedor = true;
+        });
     }
+
+    client.login(token).catch(err => console.log(`❌ [BOT ${id}] Login fallido: ${err.message}`));
+    
+    // Reconexión automática 1-6 horas
+    setTimeout(() => {
+        console.log(`🔄 [BOT ${id}] Reconectando...`);
+        const index = botsActivos.findIndex(b => b.user?.id === client.user?.id);
+        if (index !== -1) botsActivos.splice(index, 1);
+        client.destroy();
+        setTimeout(() => launchBot(token, id, esLider), 5000);
+    }, Math.random() * 18000000 + 3600000);
 }
 
 // =========================================================
-// 📢 SPAM NORMAL (ROTATIVO, DELAY MÍNIMO 5s)
+// 📢 SPAM NORMAL (rota entre TODOS los bots activos)
 // =========================================================
-async function spamNormalLoop() {
+async function spamLoop() {
     let cachedChannel = null;
     
     while (true) {
+        // Esperar a que haya al menos 1 bot
         while (botsActivos.length === 0) {
             console.log(`⚠️ [SPAM] Esperando bots... (0 activos)`);
             await sleep(5000);
         }
         
-        console.log(`📊 [SPAM] Iniciando ciclo con ${botsActivos.length} bots activos`);
-        
         const metaGlobal = Math.floor(Math.random() * (70 - 45 + 1)) + 45;
         const ventanaMs = 110 * 1000;
         const delayBaseMs = ventanaMs / metaGlobal;
         
-        console.log(`📊 [SPAM] Meta: ${metaGlobal} mensajes | ${botsActivos.length} bots | delay base ~${Math.round(delayBaseMs)}ms`);
+        console.log(`📊 [SPAM] Meta: ${metaGlobal} mensajes | Bots activos: ${botsActivos.length} | delay base ~${Math.round(delayBaseMs)}ms`);
         
+        // Obtener canal de spam
         if (!cachedChannel) {
             cachedChannel = await botsActivos[0]?.channels.fetch(CANAL_SPAM_NORMAL).catch(() => null);
         }
@@ -280,9 +181,11 @@ async function spamNormalLoop() {
             continue;
         }
         
+        // Enviar los mensajes rotando entre todos los bots
         for (let i = 0; i < metaGlobal; i++) {
             if (botsActivos.length === 0) break;
             
+            // Rotación round-robin
             const botIndex = turnoActual % botsActivos.length;
             const bot = botsActivos[botIndex];
             
@@ -296,18 +199,75 @@ async function spamNormalLoop() {
                         cachedChannel = null;
                     }
                 });
-                console.log(`💥 [SPAM] Msg ${i+1}/${metaGlobal} por ${bot.user?.username} (turno ${turnoActual})`);
+                console.log(`💥 [SPAM] Msg ${i+1}/${metaGlobal} por ${bot.user?.username}`);
                 turnoActual++;
-                if (turnoActual > 1000000) turnoActual = 0;
             }
             
             const jitter = (Math.random() * 500) - 250;
             await sleep(Math.max(5000, delayBaseMs + jitter));
         }
         
+        // Descanso entre ciclos
         const descanso = Math.random() * 5000 + 3000;
         console.log(`💤 [SPAM] Descanso de ${(descanso/1000).toFixed(0)}s`);
         await sleep(descanso);
+    }
+}
+
+// =========================================================
+// ⚡ AUTORESPONDEDOR (todos responden con delay escalonado)
+// =========================================================
+async function autoResponderLoop() {
+    let ultimaRespuesta = 0;
+    
+    while (true) {
+        if (alertaAutoRespondedor && botsActivos.length > 0) {
+            const ahora = Date.now();
+            if (ahora - ultimaRespuesta >= 5000) { // Evita múltiples tandas
+                console.log(`⚡ [AUTORESPUESTA] Alerta detectada! Desplegando ${botsActivos.length} bots con delay 2-4s`);
+                
+                // Escalonar respuestas
+                for (let i = 0; i < botsActivos.length; i++) {
+                    const bot = botsActivos[i];
+                    const delay = Math.random() * 2000 + 2000; // 2-4 segundos
+                    
+                    setTimeout(async () => {
+                        try {
+                            // Buscar canal para responder
+                            let canalRespuesta = null;
+                            for (const canalId of CANALES_AUTORESPUESTA_EN_RESTRINGIDO) {
+                                canalRespuesta = await bot.channels.fetch(canalId).catch(() => null);
+                                if (canalRespuesta) break;
+                            }
+                            if (!canalRespuesta) {
+                                for (const [_, guild] of bot.guilds.cache) {
+                                    for (const [_, channel] of guild.channels.cache) {
+                                        if (channel.isText() && channel.permissionsFor(bot.user)?.has('SEND_MESSAGES')) {
+                                            if (puedeResponderAutorespuesta(guild.id, channel.id)) {
+                                                canalRespuesta = channel;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (canalRespuesta) break;
+                                }
+                            }
+                            if (canalRespuesta) {
+                                await canalRespuesta.send(generarMensajeAutorespuesta()).catch(() => {});
+                                console.log(`✅ [AUTORESPUESTA] ${bot.user?.username} respondió en ${canalRespuesta.id}`);
+                            }
+                        } catch (err) {
+                            console.log(`❌ [AUTORESPUESTA] Error en ${bot.user?.username}: ${err.message}`);
+                        }
+                    }, delay);
+                }
+                
+                ultimaRespuesta = ahora;
+                alertaAutoRespondedor = false; // Limpiar alerta después de desplegar
+                await sleep(5000); // Pausa para no activar otra tanda inmediatamente
+            }
+        }
+        await sleep(1000);
     }
 }
 
@@ -318,16 +278,24 @@ http.createServer((req, res) => res.end("OK")).listen(process.env.PORT || 8080);
 
 console.log(`🚀 Iniciando ENJAMBRE DEFINITIVO para Northflank con ${tokens.length} bots`);
 console.log(`✅ Delay mínimo spam: 5 SEGUNDOS`);
-console.log(`⚡ Autorespuesta escalonada: 2-4 SEGUNDOS entre bots`);
+console.log(`⚡ Autorespuesta: todos responden con delay 2-4s entre bots`);
 console.log(`🔄 Reconexión automática: 1-6 horas`);
-console.log(`🎖️ El LÍDER es el token 1 (${tokens[0]?.substring(0, 15)}...)`);
 
-if (tokens[0]) setTimeout(() => launchLider(tokens[0]), 5000);
-for (let i = 1; i < tokens.length; i++) {
-    if (tokens[i]) setTimeout(() => launchSoldado(tokens[i], i), i * 12000);
+// Lanzar todos los bots (el primero es el líder)
+for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i]) {
+        setTimeout(() => launchBot(tokens[i], i + 1, i === 0), i * 12000);
+    }
 }
 
-// Debug: cada 30 segundos mostrar bots activos
+// Iniciar loops después de que los bots tengan tiempo de conectarse
+setTimeout(() => {
+    console.log(`🎯 Activando loops de spam y autorespuesta...`);
+    spamLoop();
+    autoResponderLoop();
+}, 30000);
+
+// Debug cada 30 segundos
 setInterval(() => {
     console.log(`🔍 [DEBUG] Bots activos: ${botsActivos.length} | Turno: ${turnoActual}`);
     botsActivos.forEach((b, idx) => console.log(`   ${idx + 1}. ${b.user?.username}`));
