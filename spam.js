@@ -101,7 +101,7 @@ function puedeResponderAutorespuesta(guildId, channelId) {
 }
 
 // =========================================================
-// 🤖 LÍDER (vigila y activa alerta)
+// 🤖 LÍDER (el único que inicia el spam loop)
 // =========================================================
 async function launchLider(token) {
     const client = new Client({
@@ -127,8 +127,10 @@ async function launchLider(token) {
         const tipo = TIPOS[Math.floor(Math.random() * TIPOS.length)];
         client.user.setActivity(estado, { type: tipo });
         
+        // 🔥 SOLO EL LÍDER INICIA EL SPAM LOOP
         if (!spamLoopActivo) {
             spamLoopActivo = true;
+            console.log(`🎖️ [LÍDER] Iniciando spam loop...`);
             setTimeout(() => spamNormalLoop(), 15000);
         }
     });
@@ -164,7 +166,7 @@ async function launchLider(token) {
 }
 
 // =========================================================
-// 🪖 SOLDADO
+// 🪖 SOLDADO (solo se conecta, no inicia el spam loop)
 // =========================================================
 async function launchSoldado(token, id) {
     const client = new Client({
@@ -318,8 +320,15 @@ console.log(`🚀 Iniciando ENJAMBRE DEFINITIVO para Northflank con ${tokens.len
 console.log(`✅ Delay mínimo spam: 5 SEGUNDOS`);
 console.log(`⚡ Autorespuesta escalonada: 2-4 SEGUNDOS entre bots`);
 console.log(`🔄 Reconexión automática: 1-6 horas`);
+console.log(`🎖️ El LÍDER es el token 1 (${tokens[0]?.substring(0, 15)}...)`);
 
 if (tokens[0]) setTimeout(() => launchLider(tokens[0]), 5000);
 for (let i = 1; i < tokens.length; i++) {
     if (tokens[i]) setTimeout(() => launchSoldado(tokens[i], i), i * 12000);
-            }
+}
+
+// Debug: cada 30 segundos mostrar bots activos
+setInterval(() => {
+    console.log(`🔍 [DEBUG] Bots activos: ${botsActivos.length} | Turno: ${turnoActual}`);
+    botsActivos.forEach((b, idx) => console.log(`   ${idx + 1}. ${b.user?.username}`));
+}, 30000);
